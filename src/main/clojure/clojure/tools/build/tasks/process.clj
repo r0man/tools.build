@@ -32,11 +32,16 @@
   Options:
     :command-args - required, coll of string args
     :dir - directory to run the command from, default current directory
+    :in - one of :inherit :ignore
     :out - one of :inherit :capture :write :append :ignore
     :err - one of :inherit :capture :write :append :ignore
     :out-file - file path to write if :out is :write or :append
     :err-file - file path to write if :err is :write or :append
     :env - map of environment variables to set
+
+  The :in flag takes one of the following options:
+    :inherit - inherit the stream and read the subprocess io from this process's stream
+    :ignore - ignore the stream (default)
 
   The :out and :err input flags take one of the following options:
     :inherit - inherit the stream and write the subprocess io to this process's stream (default)
@@ -44,12 +49,15 @@
     :write - write to :out-file or :err-file
     :append - append to :out-file or :err-file
     :ignore - ignore the stream"
-  [{:keys [command-args dir env out err out-file err-file]
-    :or {dir ".", out :inherit, err :inherit} :as opts}]
+  [{:keys [command-args dir env out err in out-file err-file]
+    :or {dir ".", in :ignore, out :inherit, err :inherit} :as opts}]
   (when (not (seq command-args))
     (throw (ex-info "process missing required arg :command-args" opts)))
   (let [pb (ProcessBuilder. ^List command-args)]
     (.directory pb (api/resolve-path (or dir ".")))
+    (case in
+      :ignore (.redirectInput pb ProcessBuilder$Redirect/PIPE)
+      :inherit (.redirectInput pb ProcessBuilder$Redirect/INHERIT))
     (case out
       :inherit (.redirectOutput pb ProcessBuilder$Redirect/INHERIT)
       :write (.redirectOutput pb (ProcessBuilder$Redirect/to (jio/file (api/resolve-path out-file))))
